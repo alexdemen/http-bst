@@ -1,20 +1,17 @@
 package model
 
 import (
-	error2 "github.com/alexdemen/http-bst/internal/core/error"
+	"github.com/alexdemen/http-bst/internal/core"
+	"github.com/alexdemen/http-bst/internal/core/log"
 )
 
 type Tree struct {
-	root *Node
+	root   *Node
+	logger log.Logger
 }
 
-func NewIntTree(keys []int) (tree *Tree) {
+func NewIntTree() (tree *Tree) {
 	tree = &Tree{}
-
-	for _, key := range keys {
-		tree.Add(key)
-	}
-
 	return
 }
 
@@ -47,13 +44,17 @@ func add(node *Node, addNode *Node) {
 func (tree *Tree) Find(key int) (*Node, error) {
 	result := findNode(tree.root, key)
 	if result == nil {
-		return nil, error2.NewKeyNotFoundError(key)
+		return nil, core.NewKeyNotFoundError(key)
 	}
 
 	return result, nil
 }
 
 func findNode(node *Node, key int) *Node {
+	if node == nil {
+		return nil
+	}
+
 	var nextNode *Node
 	if key < node.Key {
 		nextNode = node.LeftNode
@@ -63,34 +64,45 @@ func findNode(node *Node, key int) *Node {
 		return node
 	}
 
-	if nextNode == nil {
-		return nil
-	}
-
 	return findNode(nextNode, key)
 }
 
 func (tree *Tree) Delete(key int) {
-	node := findNode(tree.root, key)
-	if node != nil {
-		remove(node)
+	if tree.root == nil {
+		return
+	} else if tree.root.Key == key {
+		tree.root = replace(tree.root)
+		return
+	}
+
+	checkChild(tree.root, key)
+}
+
+func checkChild(node *Node, key int) {
+	if node.Key > key && node.LeftNode != nil {
+		if node.LeftNode.Key == key {
+			node.LeftNode = replace(node.LeftNode)
+		} else {
+			checkChild(node.LeftNode, key)
+		}
+	} else if node.Key < key && node.RightNode != nil {
+		if node.RightNode.Key == key {
+			node.RightNode = replace(node.RightNode)
+		} else {
+			checkChild(node.RightNode, key)
+		}
 	}
 }
 
-func remove(rmNode *Node) {
-	var transferNode *Node
-	if rmNode.RightNode != nil {
-		transferNode = rmNode.RightNode
-		if rmNode.LeftNode != nil {
-			add(transferNode, rmNode.LeftNode)
+func replace(node *Node) *Node {
+	if node.RightNode != nil {
+		if node.LeftNode != nil {
+			add(node.RightNode, node.LeftNode)
 		}
-	} else if rmNode.LeftNode != nil {
-		transferNode = rmNode.LeftNode
+		return node.RightNode
+	} else if node.LeftNode != nil {
+		return node.LeftNode
 	}
 
-	if transferNode != nil {
-		*rmNode = *transferNode
-	} else {
-		rmNode = nil
-	}
+	return nil
 }
